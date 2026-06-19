@@ -167,7 +167,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           gridData: fl_chart.FlGridData(
                             show: true,
                             drawVerticalLine: false,
-                            getDrawingHorizontalLine: (value) => fl_chart.FlLine(color: Colors.grey.withOpacity(0.2), strokeWidth: 1),
+                            getDrawingHorizontalLine: (value) => fl_chart.FlLine(color: Colors.grey.withValues(alpha: 0.2), strokeWidth: 1),
                           ),
                           borderData: fl_chart.FlBorderData(show: false),
                           barGroups: List.generate(

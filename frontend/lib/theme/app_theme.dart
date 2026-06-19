@@ -17,7 +17,7 @@ class AppTheme {
       colorScheme: const ColorScheme.dark(
         primary: primaryColor,
         surface: cardColor,
-        background: background,
+        surfaceContainer: background,
       ),
       textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
         titleLarge: const TextStyle(color: textWhite, fontWeight: FontWeight.w600),
