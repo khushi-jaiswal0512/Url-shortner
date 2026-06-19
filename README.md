@@ -49,13 +49,13 @@ flowchart TD
     B -->|Invalid| C[400 Bad Request]
     B -->|Valid| D[Generate SHA-256 Hash]
     D --> E{Exists in DB?}
-    E -->|Yes| F[Return Existing Short URL<br/>200 OK]
-    E -->|No| G[Insert Entity<br/>short_code = NULL]
+    E -->|Yes| F["Return Existing Short URL<br/>200 OK"]
+    E -->|No| G["Insert Entity<br/>short_code = NULL"]
     G --> H[Get AUTO_INCREMENT ID]
     H --> I[Base62 Encode ID]
     I --> J[Update Entity with short_code]
     J --> K[Cache in Redis]
-    K --> L[Return New Short URL<br/>201 Created]
+    K --> L["Return New Short URL<br/>201 Created"]
 ```
 
 ### Redirect Flow
@@ -68,7 +68,7 @@ flowchart TD
     D -->|Found| E[Populate Redis Cache]
     E --> C
     D -->|Not Found| F[404 Not Found]
-    C --> G[Increment Clicks<br/>Async]
+    C --> G["Increment Clicks<br/>Async"]
     G --> H[301 Moved Permanently]
 ```
 
