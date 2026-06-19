@@ -10,32 +10,47 @@ Designed as a **portfolio-grade** project demonstrating enterprise patterns: Red
 
 ```mermaid
 graph TD
-    Client["📱 Client Tiers (Flutter Web / Postman)"] -->|HTTP Requests| Nginx["🌐 Nginx Container (Reverse Proxy & Static Router)"]
+    %% 1. Define Nodes Safest Way (No HTML)
+    Client["📱 Client Tiers (Flutter Web / Postman)"]
+    Nginx["🌐 Nginx Container (Reverse Proxy)"]
+    Filter["🛡️ RateLimitFilter (Bucket4j per-IP)"]
+    Controller["🎮 UrlController (REST Endpoints)"]
+    DTO["📦 Request Data Validation"]
+    Service["⚙️ UrlServiceImpl (Core Logic Engine)"]
+    Encoder["🔢 Base62Encoder (Compression Engine)"]
+    Blacklist["🚫 Security Guard (Alias Blacklist)"]
+    CacheService["⚡ CacheService (Eviction Policies)"]
+    AsyncMetrics["🧵 AsyncMetricsProcessor (Thread Pool)"]
+    Redis["🛑 Redis 7 Container (Distributed Caching)"]
+    MySQL["🗄️ MySQL 8 Container (Persistent Volumes)"]
+
+    %% 2. Define Graph Connections (No Quotes in Arrows)
+    Client -->|HTTP Requests| Nginx
 
     subgraph "Spring Boot Application Container"
-        Nginx -->|Route to Endpoints| Filter["🛡️ RateLimitFilter (Bucket4j per-IP)"]
-        Filter -->|Valid Ingress| Controller["🎮 UrlController (REST Endpoints)"]
+        Nginx -->|Route to Endpoints| Filter
+        Filter -->|Valid Ingress| Controller
         
         subgraph "Core Business Tier"
-            Controller --> DTO["📦 Request Data Validation"]
-            DTO --> Service["⚙️ UrlServiceImpl (Core Logic Engine)"]
-            Service --> Encoder["🔢 Base62Encoder (Compression Engine)"]
-            Service --> Blacklist["🚫 Security Guard (Alias Blacklist)"]
+            Controller --> DTO
+            DTO --> Service
+            Service --> Encoder
+            Service --> Blacklist
         end
 
-        subgraph "Persistence & Optimization Drivers"
-            Service --> CacheService["⚡ CacheService (Eviction & Write Policies)"]
-            Service --> AsyncMetrics["🧵 AsyncMetricsProcessor (Thread Pool)"]
+        subgraph "Persistence Drivers"
+            Service --> CacheService
+            Service --> AsyncMetrics
         end
     end
 
     subgraph "Infrastructure Tier"
-        CacheService -->|Read / Write Hits| Redis["🛑 Redis 7 Container (Distributed Caching)"]
-        Service -->|Relational Persistence| MySQL["🗄️ MySQL 8 Container (Persistent Volumes)"]
+        CacheService -->|Read and Write Hits| Redis
+        Service -->|Relational Persistence| MySQL
         AsyncMetrics -->|Buffered Analytics Writes| MySQL
     end
 
-    %% Visual styling overrides
+    %% 3. Visual Styling
     style Client fill:#18181b,stroke:#3f3f46,stroke-width:2px,color:#fafafa
     style Nginx fill:#27272a,stroke:#3f3f46,stroke-width:2px,color:#fafafa
     style Filter fill:#7f1d1d,stroke:#ef4444,stroke-width:1px,color:#fef2f2
