@@ -1,22 +1,17 @@
 # ══════════════════════════════════════════════════════════
 # Stage 1: Build — Full JDK for Maven compilation
 # ══════════════════════════════════════════════════════════
-FROM eclipse-temurin:17-jdk-alpine AS build
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
 
-# Copy Maven wrapper and POM first (leverages Docker layer cache)
+# Copy POM first to cache dependencies
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
-RUN chmod +x mvnw
-
-# Download dependencies (cached unless pom.xml changes)
-RUN ./mvnw dependency:resolve -B
+RUN mvn dependency:resolve -B
 
 # Copy source and build
 COPY src ./src
-RUN ./mvnw clean package -DskipTests -B
+RUN mvn clean package -DskipTests -B
 
 # ══════════════════════════════════════════════════════════
 # Stage 2: Run — Lightweight JRE only

@@ -19,7 +19,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Build and Test
-        run: ./mvnw clean test
+        run: mvn clean test
 
   frontend-test:
     name: Frontend Tests
