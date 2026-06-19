@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -90,7 +91,7 @@ class UrlServiceImplTest {
             assertThat(response.isNewlyCreated()).isTrue();
 
             verify(urlRepository).saveAndFlush(any(UrlEntity.class));
-            verify(cacheService).cacheUrl(SHORT_CODE, LONG_URL);
+            verify(cacheService).cacheUrl(eq(SHORT_CODE), eq(LONG_URL), any());
         }
 
         @Test
@@ -117,7 +118,7 @@ class UrlServiceImplTest {
             assertThat(response.isNewlyCreated()).isFalse();
 
             verify(urlRepository, never()).saveAndFlush(any());
-            verify(cacheService, never()).cacheUrl(anyString(), anyString());
+            verify(cacheService, never()).cacheUrl(anyString(), anyString(), any());
         }
 
         @Test
@@ -168,7 +169,7 @@ class UrlServiceImplTest {
             String result = urlService.getOriginalUrl(SHORT_CODE);
 
             assertThat(result).isEqualTo(LONG_URL);
-            verify(cacheService).cacheUrl(SHORT_CODE, LONG_URL);
+            verify(cacheService).cacheUrl(eq(SHORT_CODE), eq(LONG_URL), any());
             verify(metricsService).incrementClickAsync(SHORT_CODE);
         }
 
