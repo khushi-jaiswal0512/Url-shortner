@@ -1,0 +1,430 @@
+{
+  "info": {
+    "name": "URL Shortener API",
+    "description": "Production-ready URL Shortener — Inspired by Alex Xu's System Design Interview.\n\nEndpoints:\n- POST /api/v1/urls — Create short URL\n- GET /{shortCode} — 301 Redirect\n- GET /api/v1/urls/{shortCode}/analytics — Fetch analytics\n- DELETE /api/v1/urls/{shortCode} — Soft delete",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "short_code",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/actuator/health",
+          "host": ["{{base_url}}"],
+          "path": ["actuator", "health"]
+        },
+        "description": "Spring Boot Actuator health endpoint — verifies MySQL and Redis connectivity."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Health check returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Status is UP', function () {",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.status).to.eql('UP');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Short URL",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"longUrl\": \"https://www.google.com/search?q=system+design+interview\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/urls",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "urls"]
+        },
+        "description": "Creates a short URL from a long URL. Returns 201 Created for new URLs, 200 OK for duplicates."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var status = pm.response.code;",
+              "",
+              "pm.test('Returns 201 Created or 200 OK', function () {",
+              "    pm.expect(status).to.be.oneOf([201, 200]);",
+              "});",
+              "",
+              "pm.test('Response contains shortCode', function () {",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.shortCode).to.be.a('string');",
+              "    pm.expect(json.shortCode.length).to.be.greaterThan(0);",
+              "});",
+              "",
+              "pm.test('Response contains shortUrl', function () {",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.shortUrl).to.include(json.shortCode);",
+              "});",
+              "",
+              "// Save shortCode for subsequent requests",
+              "if (status === 201 || status === 200) {",
+              "    var json = pm.response.json();",
+              "    pm.collectionVariables.set('short_code', json.shortCode);",
+              "    console.log('Saved short_code: ' + json.shortCode);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Short URL — Duplicate",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"longUrl\": \"https://www.google.com/search?q=system+design+interview\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/urls",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "urls"]
+        },
+        "description": "Submits the same URL again — should return 200 OK with the same shortCode."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Duplicate returns 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Returns same shortCode as original', function () {",
+              "    var json = pm.response.json();",
+              "    var savedCode = pm.collectionVariables.get('short_code');",
+              "    pm.expect(json.shortCode).to.eql(savedCode);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Short URL — Invalid (No Protocol)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"longUrl\": \"not-a-valid-url\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/urls",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "urls"]
+        },
+        "description": "Validation test — URL without http/https protocol should return 400."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Invalid URL returns 400', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('Error response has correct structure', function () {",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.status).to.eql(400);",
+              "    pm.expect(json.error).to.eql('Bad Request');",
+              "    pm.expect(json.message).to.be.a('string');",
+              "    pm.expect(json.timestamp).to.be.a('string');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Short URL — Invalid (Empty Body)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"longUrl\": \"\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/urls",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "urls"]
+        },
+        "description": "Validation test — empty URL should return 400."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Empty URL returns 400', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Redirect (301)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/{{short_code}}",
+          "host": ["{{base_url}}"],
+          "path": ["{{short_code}}"]
+        },
+        "description": "Redirects to the original long URL via 301 Moved Permanently.\n\nNote: Postman follows redirects by default. Disable 'Automatically follow redirects' in Settings to see the raw 301."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Ensure short_code is set",
+              "var code = pm.collectionVariables.get('short_code');",
+              "if (!code) {",
+              "    console.warn('short_code not set — run \"Create Short URL\" first');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Redirect — Not Found",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/nonExistentCode99",
+          "host": ["{{base_url}}"],
+          "path": ["nonExistentCode99"]
+        },
+        "description": "Attempting to redirect a non-existent short code should return 404."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Non-existent code returns 404', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Analytics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/urls/{{short_code}}/analytics",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "urls", "{{short_code}}", "analytics"]
+        },
+        "description": "Returns analytics data: click count, creation date, last accessed time."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Analytics returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response contains analytics fields', function () {",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.shortCode).to.be.a('string');",
+              "    pm.expect(json.longUrl).to.be.a('string');",
+              "    pm.expect(json.clickCount).to.be.a('number');",
+              "    pm.expect(json.createdAt).to.be.a('string');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Analytics — Not Found",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/urls/nonExistent/analytics",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "urls", "nonExistent", "analytics"]
+        },
+        "description": "Analytics for a non-existent short code should return 404."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Non-existent analytics returns 404', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete Short URL",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/urls/{{short_code}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "urls", "{{short_code}}"]
+        },
+        "description": "Soft-deletes the URL mapping and evicts it from Redis cache."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Delete returns 204 No Content', function () {",
+              "    pm.response.to.have.status(204);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete Short URL — Already Deleted",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/urls/{{short_code}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "urls", "{{short_code}}"]
+        },
+        "description": "Deleting an already soft-deleted URL should return 404."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Re-delete returns 404', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Redirect After Delete — Not Found",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/{{short_code}}",
+          "host": ["{{base_url}}"],
+          "path": ["{{short_code}}"]
+        },
+        "description": "Redirecting after soft-delete should return 404."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Redirect after delete returns 404', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}

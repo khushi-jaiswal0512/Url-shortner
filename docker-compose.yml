@@ -1,0 +1,98 @@
+# ══════════════════════════════════════════════════════════
+# URL Shortener — Docker Compose Stack
+# Services: Spring Boot App | MySQL 8 | Redis 7
+# Usage:  docker-compose up -d
+# ══════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  # ── Spring Boot Application ────────────────────────
+  app:
+    build: .
+    container_name: url-shortener-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: url_shortener
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BASE_URL: http://localhost:8080
+      SERVER_PORT: 8080
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - url-shortener-network
+
+  # ── MySQL 8 Database ──────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: url-shortener-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: url_shortener
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - url-shortener-network
+
+  # ── Redis 7 Cache ─────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: url-shortener-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - url-shortener-network
+
+  # ── Flutter Frontend ──────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: url-shortener-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    networks:
+      - url-shortener-network
+
+# ── Persistent Volumes ─────────────────────────────
+volumes:
+  mysql_data:
+    driver: local
+
+# ── Network ────────────────────────────────────────
+networks:
+  url-shortener-network:
+    driver: bridge
