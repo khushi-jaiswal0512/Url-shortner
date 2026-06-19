@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/url_model.dart';
 import 'service_providers.dart';
 import 'dashboard_provider.dart';
-import 'url_provider.dart';
 
 class HistoryState {
   final bool isLoading;

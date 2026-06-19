@@ -1,4 +1,4 @@
-import 
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/url_model.dart';
 import 'service_providers.dart';

@@ -122,7 +122,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 SizedBox(
                   height: 250,
                   child: Card(
-                    padding: const EdgeInsets.all(16),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 24.0, right: 16.0),
                       child: fl_chart.BarChart(
