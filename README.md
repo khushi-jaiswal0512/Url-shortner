@@ -10,33 +10,32 @@ Designed as a **portfolio-grade** project demonstrating enterprise patterns: Red
 
 ```mermaid
 graph TD
-    %% Client Layer Ingress
-    Client["📱 Client Tiers<br/>(Flutter Web / Postman)"] -->|HTTP Requests| Nginx["🌐 Nginx Container<br/>(Reverse Proxy & Static Router)"]
+    Client["📱 Client Tiers (Flutter Web / Postman)"] -->|HTTP Requests| Nginx["🌐 Nginx Container (Reverse Proxy & Static Router)"]
 
     subgraph "Spring Boot Application Container"
-        Nginx -->|"/api/v1/urls"| Filter["🛡️ RateLimitFilter<br/>(Bucket4j per-IP)"]
-        Filter -->|Valid Ingress| Controller["🎮 UrlController<br/>(REST Endpoints)"]
+        Nginx -->|Route to Endpoints| Filter["🛡️ RateLimitFilter (Bucket4j per-IP)"]
+        Filter -->|Valid Ingress| Controller["🎮 UrlController (REST Endpoints)"]
         
         subgraph "Core Business Tier"
-            Controller --> DTO["📦 Request Data Validation<br/>(Regex & Custom Constraints)"]
-            DTO --> Service["⚙️ UrlServiceImpl<br/>(Core Logic Engine)"]
-            Service --> Encoder["🔢 Base62Encoder<br/>(Compression Algorithm)"]
-            Service --> Blacklist["🚫 Security Guard<br/>(Alias Blacklist Check)"]
+            Controller --> DTO["📦 Request Data Validation"]
+            DTO --> Service["⚙️ UrlServiceImpl (Core Logic Engine)"]
+            Service --> Encoder["🔢 Base62Encoder (Compression Engine)"]
+            Service --> Blacklist["🚫 Security Guard (Alias Blacklist)"]
         end
 
         subgraph "Persistence & Optimization Drivers"
-            Service --> CacheService["⚡ CacheService<br/>(Eviction & Write Policies)"]
-            Service --> AsyncMetrics["🧵 AsyncMetricsProcessor<br/>(Decoupled Thread Pool)"]
+            Service --> CacheService["⚡ CacheService (Eviction & Write Policies)"]
+            Service --> AsyncMetrics["🧵 AsyncMetricsProcessor (Thread Pool)"]
         end
     end
 
     subgraph "Infrastructure Tier"
-        CacheService -->|Read / Write Hits| Redis["🛑 Redis 7 Container<br/>(Distributed Caching)"]
-        Service -->|Relational Persistence| MySQL["🗄️ MySQL 8 Container<br/>(Persistent Volumes)"]
+        CacheService -->|Read / Write Hits| Redis["🛑 Redis 7 Container (Distributed Caching)"]
+        Service -->|Relational Persistence| MySQL["🗄️ MySQL 8 Container (Persistent Volumes)"]
         AsyncMetrics -->|Buffered Analytics Writes| MySQL
     end
 
-    %% Visual styling overrides for node clarity
+    %% Visual styling overrides
     style Client fill:#18181b,stroke:#3f3f46,stroke-width:2px,color:#fafafa
     style Nginx fill:#27272a,stroke:#3f3f46,stroke-width:2px,color:#fafafa
     style Filter fill:#7f1d1d,stroke:#ef4444,stroke-width:1px,color:#fef2f2
