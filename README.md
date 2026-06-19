@@ -9,36 +9,40 @@ Designed as a **portfolio-grade** project demonstrating enterprise patterns: Red
 ## 📐 Architecture
 
 ```mermaid
-graph TB
-    subgraph Client
-        A[Browser / Postman]
+graph TD
+    %% Client Layer Ingress
+    Client["📱 Client Tiers<br/>(Flutter Web / Postman)"] -->|HTTP Requests| Nginx["🌐 Nginx Container<br/>(Reverse Proxy & Static Router)"]
+
+    subgraph "Spring Boot Application Container"
+        Nginx -->|"/api/v1/urls"| Filter["🛡️ RateLimitFilter<br/>(Bucket4j per-IP)"]
+        Filter -->|Valid Ingress| Controller["🎮 UrlController<br/>(REST Endpoints)"]
+        
+        subgraph "Core Business Tier"
+            Controller --> DTO["📦 Request Data Validation<br/>(Regex & Custom Constraints)"]
+            DTO --> Service["⚙️ UrlServiceImpl<br/>(Core Logic Engine)"]
+            Service --> Encoder["🔢 Base62Encoder<br/>(Compression Algorithm)"]
+            Service --> Blacklist["🚫 Security Guard<br/>(Alias Blacklist Check)"]
+        end
+
+        subgraph "Persistence & Optimization Drivers"
+            Service --> CacheService["⚡ CacheService<br/>(Eviction & Write Policies)"]
+            Service --> AsyncMetrics["🧵 AsyncMetricsProcessor<br/>(Decoupled Thread Pool)"]
+        end
     end
 
-    subgraph "Spring Boot Application"
-        B["RateLimitFilter<br/>Bucket4j per-IP"]
-        C["UrlController<br/>REST API"]
-        D["UrlServiceImpl<br/>Business Logic"]
-        E["UrlMetricsService<br/>@Async Click Tracking"]
-        F["UrlCacheService<br/>Redis Abstraction"]
+    subgraph "Infrastructure Tier"
+        CacheService -->|Read / Write Hits| Redis["🛑 Redis 7 Container<br/>(Distributed Caching)"]
+        Service -->|Relational Persistence| MySQL["🗄️ MySQL 8 Container<br/>(Persistent Volumes)"]
+        AsyncMetrics -->|Buffered Analytics Writes| MySQL
     end
 
-    subgraph Infrastructure
-        G[("MySQL 8<br/>Primary Storage")]
-        H[("Redis 7<br/>Cache Layer")]
-    end
-
-    A -->|HTTP| B
-    B --> C
-    C --> D
-    D --> F
-    D --> E
-    F --> H
-    D --> G
-    E -->|Async| G
-
-    style B fill:#ff6b6b,stroke:#333,color:#fff
-    style H fill:#6c5ce7,stroke:#333,color:#fff
-    style G fill:#0984e3,stroke:#333,color:#fff
+    %% Visual styling overrides for node clarity
+    style Client fill:#18181b,stroke:#3f3f46,stroke-width:2px,color:#fafafa
+    style Nginx fill:#27272a,stroke:#3f3f46,stroke-width:2px,color:#fafafa
+    style Filter fill:#7f1d1d,stroke:#ef4444,stroke-width:1px,color:#fef2f2
+    style Redis fill:#7c2d12,stroke:#ea580c,stroke-width:1px,color:#fff7ed
+    style MySQL fill:#1e3a8a,stroke:#3b82f6,stroke-width:1px,color:#eff6ff
+    style Service fill:#312e81,stroke:#6366f1,stroke-width:1px,color:#e0e7ff
 ```
 
 ### Shortening Flow
