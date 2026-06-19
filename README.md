@@ -10,53 +10,47 @@ Designed as a **portfolio-grade** project demonstrating enterprise patterns: Red
 
 ```mermaid
 graph TD
-    %% 1. Define Nodes Safest Way (No HTML)
-    Client["📱 Client Tiers (Flutter Web / Postman)"]
-    Nginx["🌐 Nginx Container (Reverse Proxy)"]
-    Filter["🛡️ RateLimitFilter (Bucket4j per-IP)"]
-    Controller["🎮 UrlController (REST Endpoints)"]
-    DTO["📦 Request Data Validation"]
-    Service["⚙️ UrlServiceImpl (Core Logic Engine)"]
-    Encoder["🔢 Base62Encoder (Compression Engine)"]
-    Blacklist["🚫 Security Guard (Alias Blacklist)"]
-    CacheService["⚡ CacheService (Eviction Policies)"]
-    AsyncMetrics["🧵 AsyncMetricsProcessor (Thread Pool)"]
-    Redis["🛑 Redis 7 Container (Distributed Caching)"]
-    MySQL["🗄️ MySQL 8 Container (Persistent Volumes)"]
+    %% Define Nodes
+    Client["Client Tiers (Flutter Web / Postman)"]
+    Nginx["Nginx Container (Reverse Proxy)"]
+    Filter["RateLimitFilter (Bucket4j per-IP)"]
+    Controller["UrlController (REST Endpoints)"]
+    DTO["Request Data Validation"]
+    Service["UrlServiceImpl (Core Logic Engine)"]
+    Encoder["Base62Encoder (Compression Engine)"]
+    Blacklist["Security Guard (Alias Blacklist)"]
+    CacheService["CacheService (Eviction Policies)"]
+    AsyncMetrics["AsyncMetricsProcessor (Thread Pool)"]
+    Redis["Redis 7 Container (Distributed Caching)"]
+    MySQL["MySQL 8 Container (Persistent Volumes)"]
 
-    %% 2. Define Graph Connections (No Quotes in Arrows)
+    %% Define Connections
     Client -->|HTTP Requests| Nginx
 
-    subgraph "Spring Boot Application Container"
+    subgraph SpringBoot [Spring Boot Application Container]
         Nginx -->|Route to Endpoints| Filter
         Filter -->|Valid Ingress| Controller
-        
-        subgraph "Core Business Tier"
-            Controller --> DTO
-            DTO --> Service
-            Service --> Encoder
-            Service --> Blacklist
-        end
-
-        subgraph "Persistence Drivers"
-            Service --> CacheService
-            Service --> AsyncMetrics
-        end
+        Controller --> DTO
+        DTO --> Service
+        Service --> Encoder
+        Service --> Blacklist
+        Service --> CacheService
+        Service --> AsyncMetrics
     end
 
-    subgraph "Infrastructure Tier"
+    subgraph InfraTier [Infrastructure Tier]
         CacheService -->|Read and Write Hits| Redis
         Service -->|Relational Persistence| MySQL
-        AsyncMetrics -->|Buffered Analytics Writes| MySQL
+        AsyncMetrics -->|Buffered Analytics| MySQL
     end
 
-    %% 3. Visual Styling
-    style Client fill:#18181b,stroke:#3f3f46,stroke-width:2px,color:#fafafa
-    style Nginx fill:#27272a,stroke:#3f3f46,stroke-width:2px,color:#fafafa
-    style Filter fill:#7f1d1d,stroke:#ef4444,stroke-width:1px,color:#fef2f2
-    style Redis fill:#7c2d12,stroke:#ea580c,stroke-width:1px,color:#fff7ed
-    style MySQL fill:#1e3a8a,stroke:#3b82f6,stroke-width:1px,color:#eff6ff
-    style Service fill:#312e81,stroke:#6366f1,stroke-width:1px,color:#e0e7ff
+    %% Visual Styling
+    style Client fill:#18181b,stroke:#3f3f46,color:#fafafa
+    style Nginx fill:#27272a,stroke:#3f3f46,color:#fafafa
+    style Filter fill:#7f1d1d,stroke:#ef4444,color:#fef2f2
+    style Redis fill:#7c2d12,stroke:#ea580c,color:#fff7ed
+    style MySQL fill:#1e3a8a,stroke:#3b82f6,color:#eff6ff
+    style Service fill:#312e81,stroke:#6366f1,color:#e0e7ff
 ```
 
 ### Shortening Flow
