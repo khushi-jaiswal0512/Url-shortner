@@ -15,16 +15,16 @@ graph TB
     end
 
     subgraph "Spring Boot Application"
-        B[RateLimitFilter<br/>Bucket4j per-IP]
-        C[UrlController<br/>REST API]
-        D[UrlServiceImpl<br/>Business Logic]
-        E[UrlMetricsService<br/>@Async Click Tracking]
-        F[UrlCacheService<br/>Redis Abstraction]
+        B["RateLimitFilter<br/>Bucket4j per-IP"]
+        C["UrlController<br/>REST API"]
+        D["UrlServiceImpl<br/>Business Logic"]
+        E["UrlMetricsService<br/>@Async Click Tracking"]
+        F["UrlCacheService<br/>Redis Abstraction"]
     end
 
     subgraph Infrastructure
-        G[(MySQL 8<br/>Primary Storage)]
-        H[(Redis 7<br/>Cache Layer)]
+        G[("MySQL 8<br/>Primary Storage")]
+        H[("Redis 7<br/>Cache Layer")]
     end
 
     A -->|HTTP| B
