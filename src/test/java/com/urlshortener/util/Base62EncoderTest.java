@@ -29,13 +29,13 @@ class Base62EncoderTest {
 
     @ParameterizedTest(name = "encode({0}) = \"{1}\"")
     @CsvSource({
-            "10, a",
-            "35, z",
-            "36, A",
-            "61, Z",
+            "10, A",
+            "35, Z",
+            "36, a",
+            "61, z",
             "62, 10",
-            "1000, g8",
-            "123456789, 8m0kv"
+            "1000, G8",
+            "123456789, 8M0kX"
     })
     @DisplayName("Encode known values")
     void encode_knownValues(long id, String expected) {
@@ -46,10 +46,10 @@ class Base62EncoderTest {
     @CsvSource({
             "0, 0",
             "1, 1",
-            "10, a",
+            "10, A",
             "62, 10",
-            "1000, g8",
-            "123456789, 8m0kv"
+            "1000, G8",
+            "123456789, 8M0kX"
     })
     @DisplayName("Decode known values")
     void decode_knownValues(long expected, String shortCode) {

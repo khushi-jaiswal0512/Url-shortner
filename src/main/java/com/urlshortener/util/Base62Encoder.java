@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class Base62Encoder {
 
-    private static final String ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final String ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     private static final int BASE = ALPHABET.length(); // 62
 
     /**
