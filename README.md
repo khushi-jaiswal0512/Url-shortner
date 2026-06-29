@@ -1,47 +1,47 @@
 # 🔗 URL Shortener
 
-A **production-ready URL Shortener** backend built with Java 17+ & Spring Boot 3, inspired by [Alex Xu's *System Design Interview*](https://www.amazon.com/System-Design-Interview-insiders-Second/dp/B08CMF2CQF) book.
-
+A **production-ready URL Shortener** backend built with Java 17+ & Spring Boot 3. 
 Designed as a **portfolio-grade** project demonstrating enterprise patterns: Redis caching, async processing, rate limiting, and clean layered architecture.
 
 ---
 
 ## 📐 Architecture
 
+### Overall System Architecture
+
 ```mermaid
 graph TD
     %% Define Nodes
-    Client["Client Tiers (Flutter Web / Postman)"]
+    Client["Client (Flutter Web / Postman)"]
     Nginx["Nginx Container (Reverse Proxy)"]
     Filter["RateLimitFilter (Bucket4j per-IP)"]
     Controller["UrlController (REST Endpoints)"]
-    DTO["Request Data Validation"]
+    Validation["Request Data Validation"]
     Service["UrlServiceImpl (Core Logic Engine)"]
     Encoder["Base62Encoder (Compression Engine)"]
-    Blacklist["Security Guard (Alias Blacklist)"]
-    CacheService["CacheService (Eviction Policies)"]
-    AsyncMetrics["AsyncMetricsProcessor (Thread Pool)"]
+    CacheService["UrlCacheService (Redis Abstraction)"]
+    MetricsService["UrlMetricsService (@Async Thread Pool)"]
     Redis["Redis 7 Container (Distributed Caching)"]
-    MySQL["MySQL 8 Container (Persistent Volumes)"]
+    MySQL["MySQL 8 Container (Persistent Storage)"]
 
     %% Define Connections
     Client -->|HTTP Requests| Nginx
 
-    subgraph SpringBoot [Spring Boot Application Container]
-        Nginx -->|Route to Endpoints| Filter
+    subgraph SpringBoot [Spring Boot Application]
+        Nginx -->|Route| Filter
         Filter -->|Valid Ingress| Controller
-        Controller --> DTO
-        DTO --> Service
+        Controller --> Validation
+        Validation --> Service
         Service --> Encoder
-        Service --> Blacklist
         Service --> CacheService
-        Service --> AsyncMetrics
+        Service --> MetricsService
     end
 
     subgraph InfraTier [Infrastructure Tier]
-        CacheService -->|Read and Write Hits| Redis
-        Service -->|Relational Persistence| MySQL
-        AsyncMetrics -->|Buffered Analytics| MySQL
+        CacheService -.->|Read/Write/Evict| Redis
+        CacheService -.->|Fallback on failure| Service
+        Service -->|Persist URL| MySQL
+        MetricsService -->|Async update click_count| MySQL
     end
 
     %% Visual Styling
@@ -53,350 +53,175 @@ graph TD
     style Service fill:#312e81,stroke:#6366f1,color:#e0e7ff
 ```
 
-### Shortening Flow
+---
 
-```mermaid
-flowchart TD
-    A[Receive Long URL] --> B{Validate URL}
-    B -->|Invalid| C[400 Bad Request]
-    B -->|Valid| D[Generate SHA-256 Hash]
-    D --> E{Exists in DB?}
-    E -->|Yes| F["Return Existing Short URL<br/>200 OK"]
-    E -->|No| G["Insert Entity<br/>short_code = NULL"]
-    G --> H[Get AUTO_INCREMENT ID]
-    H --> I[Base62 Encode ID]
-    I --> J[Update Entity with short_code]
-    J --> K[Cache in Redis]
-    K --> L["Return New Short URL<br/>201 Created"]
+## 🗂️ Folder Structure
+
 ```
-
-### Redirect Flow
-
-```mermaid
-flowchart TD
-    A["GET /{shortCode}"] --> B{Redis Cache Hit?}
-    B -->|Yes| C[Return Long URL]
-    B -->|No| D{MySQL Lookup}
-    D -->|Found| E[Populate Redis Cache]
-    E --> C
-    D -->|Not Found| F[404 Not Found]
-    C --> G["Increment Clicks<br/>Async"]
-    G --> H[301 Moved Permanently]
+src/main/java/com/urlshortener/
+├── UrlShortenerApplication.java     # Main Spring Boot entry point (@EnableAsync)
+├── cache/
+│   └── UrlCacheService.java         # Abstracts RedisTemplate; implements silent fallback if Redis is down
+├── config/
+│   ├── CorsConfig.java              # Configures global CORS (dev vs prod origins)
+│   ├── RateLimitFilter.java         # Bucket4j per-IP rate limit filter
+│   ├── RedisConfig.java             # Configures RedisTemplate (String keys/values)
+│   └── SwaggerConfig.java           # Springdoc OpenAPI UI configuration
+├── controller/
+│   └── UrlController.java           # REST endpoints (POST, GET, DELETE)
+├── dto/
+│   └── CreateUrlRequest.java        # Bean Validation for incoming requests
+├── entity/
+│   └── UrlEntity.java               # JPA Entity mapping to the `urls` table
+├── exception/
+│   ├── GlobalExceptionHandler.java  # @RestControllerAdvice for unified JSON errors
+│   ├── InvalidUrlException.java     # Thrown for malformed URLs
+│   ├── RateLimitExceededException.java
+│   └── UrlNotFoundException.java    
+├── repository/
+│   └── UrlRepository.java           # Spring Data JPA interface (MySQL/H2)
+├── response/
+│   ├── ErrorResponse.java           # Standardized error JSON payload
+│   └── UrlResponse.java             # Standardized success JSON payload
+├── service/
+│   ├── UrlMetricsService.java       # Handles async click tracking
+│   ├── UrlService.java              # Core interface
+│   └── UrlServiceImpl.java          # Core logic (SHA-256 duplicate detection, Base62 encoding)
+└── util/
+    └── Base62Encoder.java           # Converts Long IDs to Base62 short codes
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## ✨ Implemented Features
 
-| Layer | Technology |
-|---|---|
-| Language | Java 17+ |
-| Framework | Spring Boot 3.3 |
-| Build | Maven (with wrapper) |
-| Database | MySQL 8 |
-| Cache | Redis 7 |
-| ORM | Spring Data JPA / Hibernate |
-| Validation | Jakarta Bean Validation |
-| Rate Limiting | Bucket4j |
-| API Docs | Springdoc OpenAPI (Swagger UI) |
-| Testing | JUnit 5, Mockito, MockMvc, H2 |
-| Containerization | Docker, Docker Compose |
-| Productivity | Lombok |
+| Feature | Implemented | Description | Responsible Classes |
+|---|:---:|---|---|
+| URL Shortening | ✅ | Converts long URL into a short code | `UrlController`, `UrlServiceImpl` |
+| Redirect | ✅ | 301 redirects short code to original URL | `UrlController`, `UrlServiceImpl` |
+| Analytics | ✅ | Tracks clicks and last accessed time | `UrlController`, `UrlServiceImpl` |
+| Duplicate Detection | ✅ | Prevents storing the same URL twice | `UrlServiceImpl` (via `url_hash`) |
+| SHA-256 Hashing | ✅ | Generates a 64-char hash for duplicate checks | `UrlServiceImpl` |
+| Base62 Encoding | ✅ | Compresses IDs using 0-9A-Za-z | `Base62Encoder` |
+| Redis Cache | ✅ | Caches redirects to bypass DB lookups | `UrlCacheService` |
+| Redis Fallback | ✅ | System survives if Redis crashes | `UrlCacheService` |
+| Local Profile | ❌ | **Not Implemented** (See `test` profile instead) | N/A |
+| H2 Database | ✅ | In-memory DB used for testing/local isolation | `application-test.yml` |
+| MySQL | ✅ | Primary persistent storage | `application.yml` |
+| Docker | ✅ | Containerized app, DB, and cache | `Dockerfile`, `docker-compose.yml` |
+| Swagger | ✅ | Auto-generated OpenAPI documentation | `SwaggerConfig` |
+| Validation | ✅ | Rejects empty or invalid URLs | `CreateUrlRequest` |
+| Exception Handling | ✅ | Standardized API errors | `GlobalExceptionHandler` |
+| Async Processing | ✅ | Non-blocking click analytics updates | `UrlMetricsService` |
+| Rate Limiting | ✅ | Bucket4j prevents API abuse | `RateLimitFilter` |
+| Health Endpoint | ✅ | Spring Actuator health monitoring | `application.yml` |
+| Logging | ✅ | Configured SLF4J logging levels per profile | `application.yml` |
+| Testing | ✅ | 48 tests across all layers | `*Test.java` files |
+
+*(Note: During audit, it was confirmed that a dedicated `local` profile does not exist. However, the `test` profile perfectly achieves isolated local development via H2 and disabled Redis).*
+
+---
+
+## 🔄 Request Lifecycle
+
+### POST `/api/v1/urls` (Shortening)
+`Client` ➔ `RateLimitFilter` (Check IP limit) ➔ `UrlController` ➔ `CreateUrlRequest` (Validate URL format) ➔ `UrlServiceImpl` ➔ `SHA-256` (Hash URL) ➔ `UrlRepository` (Check duplicate hash) ➔ **If new:** `UrlRepository` (Save empty code for ID) ➔ `Base62Encoder` (Encode ID) ➔ `UrlRepository` (Update shortCode) ➔ `UrlCacheService` (Cache in Redis) ➔ `UrlResponse`
+
+### GET `/{shortCode}` (Redirect)
+`Client` ➔ `RateLimitFilter` ➔ `UrlController` ➔ `UrlServiceImpl` ➔ `UrlCacheService` (Redis Lookup) ➔ **If Miss:** `UrlRepository` (MySQL Lookup) + Populate Cache ➔ `UrlMetricsService` (@Async Increment Clicks) ➔ `301 Moved Permanently`
+
+---
+
+## ⚡ Cache Architecture & Flows
+
+### Cache Hit
+`Client` ➔ `Controller` ➔ `UrlCacheService` ➔ **Found in Redis** ➔ `Response` (DB bypassed)
+
+### Cache Miss
+`Client` ➔ `Controller` ➔ `UrlCacheService` ➔ **Not Found** ➔ `UrlRepository` (MySQL) ➔ `UrlCacheService` (Save to Redis) ➔ `Response`
+
+### Redis Fallback (Fault Tolerance)
+`Client` ➔ `Controller` ➔ `UrlCacheService` ➔ **Redis Connection Refused/Timeout** ➔ `Exception Caught Silently` ➔ `UrlRepository` (Fallback to MySQL) ➔ `Response` (Application continues normally)
+
+---
+
+## ⚙️ Configuration & Profiles
+
+All configuration is managed inside `src/main/resources/application.yml` and `src/test/resources/application-test.yml`.
+
+| Profile | Database | Cache | Flyway | Logging | Purpose |
+|---|---|---|---|---|---|
+| `default` | MySQL | Redis | Disabled | INFO | Base configuration inherited by others |
+| `dev` | MySQL (Update) | Redis | Disabled | DEBUG | Active local development (auto schema updates) |
+| `docker` | MySQL (Update) | Redis | Disabled | INFO | Running inside `docker-compose` |
+| `prod` | MySQL (Validate) | Redis | Enabled | INFO | Production deployment (strict schema validation) |
+| `test` | **H2 (In-Memory)** | **Disabled** | Disabled | INFO | Isolated testing & local running without infra |
+
+---
+
+## 💻 Local Development (No Infra Required)
+
+If you want to run the application locally **without** installing MySQL or Redis, you can utilize the `test` profile. This profile auto-configures an in-memory **H2 database** and completely disables Redis auto-configuration.
+
+**Startup Command:**
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=test
+```
+*Why this exists: To allow immediate contributor onboarding and rapid UI development without needing to spin up Docker containers or local databases.*
+
+---
+
+## 🧪 Testing Documentation
+
+The repository features a robust test suite of **48 tests** ensuring absolute stability across all architectural layers.
+
+| Test Class | Framework | Layer | Strategy & Purpose |
+|---|---|---|---|
+| `UrlShortenerApplicationTests` | SpringBootTest | Context | Verifies the entire Spring context boots successfully (using mocked RedisTemplate). |
+| `UrlControllerTest` | MockMvc | Controller | `@WebMvcTest` isolates the web layer, mocks services, and asserts HTTP status codes/JSON. |
+| `UrlServiceImplTest` | Mockito | Service | Pure unit tests mocking dependencies (Cache/DB) to test SHA-256, Base62 logic, and exception throwing. |
+| `UrlRepositoryTest` | DataJpaTest | Repository | Isolated JPA tests running on H2 to verify custom queries and duplicate constraint handling. |
+| `Base62EncoderTest` | JUnit 5 | Utility | Parameterized tests asserting exact Base62 alphabet (`0-9A-Za-z`) mathematical conversions. |
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- **Java 17+** (JDK)
-- **Maven 3.8+** (or use the included Maven wrapper `./mvnw`)
-- **MySQL 8** running on port `3306`
-- **Redis 7** running on port `6379`
-
-### Option 1: Run with Docker Compose (Recommended)
-
+### Option A: Local Sandbox (No Infra)
+Run entirely in-memory using H2. No MySQL or Redis required.
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/url-shortener.git
-cd url-shortener
-
-# Start all services (app + MySQL + Redis)
-docker-compose up -d
-
-# Verify health
-curl http://localhost:8080/actuator/health
+./mvnw clean spring-boot:run -Dspring-boot.run.profiles=test
 ```
 
-### Option 2: Run Locally
-
+### Option B: Full Production Stack (Docker)
+Spins up the full stack (Spring Boot, MySQL 8, Redis 7, Flutter Web) exactly as it would run in production.
 ```bash
-# 1. Ensure MySQL and Redis are running locally
-
-# 2. Create the database
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS url_shortener;"
-
-# 3. Build and run
-./mvnw clean package -DskipTests
-java -jar target/url-shortener-1.0.0.jar --spring.profiles.active=dev
+docker-compose up -d --build
 ```
-
-### Option 3: Run Tests Only
-
-```bash
-./mvnw clean test
-```
+Access the backend API at `http://localhost:8080/swagger-ui.html` and the frontend at `http://localhost:80`.
 
 ---
 
-## 📡 API Endpoints
+## 🛠️ Technology Stack
 
-| Method | Endpoint | Description | Status Codes |
-|---|---|---|---|
-| `POST` | `/api/v1/urls` | Create short URL | `201`, `200`, `400`, `429` |
-| `GET` | `/{shortCode}` | Redirect to original URL | `301`, `404` |
-| `GET` | `/api/v1/urls/{shortCode}/analytics` | Fetch analytics | `200`, `404` |
-| `DELETE` | `/api/v1/urls/{shortCode}` | Soft delete URL | `204`, `404` |
-| `GET` | `/actuator/health` | Health check | `200` |
-| `GET` | `/swagger-ui/index.html` | Swagger UI | `200` |
-
-### Example: Create Short URL
-
-```bash
-curl -X POST http://localhost:8080/api/v1/urls \
-  -H "Content-Type: application/json" \
-  -d '{"longUrl": "https://www.google.com/search?q=system+design"}'
-```
-
-**Response (201 Created):**
-```json
-{
-  "shortCode": "aB3kPq",
-  "shortUrl": "http://localhost:8080/aB3kPq",
-  "longUrl": "https://www.google.com/search?q=system+design",
-  "createdAt": "2026-06-20T01:00:00"
-}
-```
-
-### Example: Get Analytics
-
-```bash
-curl http://localhost:8080/api/v1/urls/aB3kPq/analytics
-```
-
-**Response (200 OK):**
-```json
-{
-  "shortCode": "aB3kPq",
-  "shortUrl": "http://localhost:8080/aB3kPq",
-  "longUrl": "https://www.google.com/search?q=system+design",
-  "clickCount": 42,
-  "createdAt": "2026-06-20T01:00:00",
-  "lastAccessed": "2026-06-20T12:30:00"
-}
-```
-
----
-
-## 📁 Project Structure
-
-```
-src/main/java/com/urlshortener/
-├── UrlShortenerApplication.java     # Main class (@EnableAsync)
-├── cache/
-│   └── UrlCacheService.java         # Redis abstraction (get/set/evict)
-├── config/
-│   ├── CorsConfig.java              # CORS (all origins dev, restricted prod)
-│   ├── RateLimitFilter.java         # Bucket4j per-IP rate limiting
-│   ├── RedisConfig.java             # RedisTemplate with String serializers
-│   └── SwaggerConfig.java           # OpenAPI metadata
-├── controller/
-│   └── UrlController.java           # REST endpoints
-├── dto/
-│   └── CreateUrlRequest.java        # Validated request DTO
-├── entity/
-│   └── UrlEntity.java               # JPA entity → urls table
-├── exception/
-│   ├── GlobalExceptionHandler.java  # @RestControllerAdvice
-│   ├── InvalidUrlException.java     # 400
-│   ├── RateLimitExceededException.java  # 429
-│   └── UrlNotFoundException.java    # 404
-├── repository/
-│   └── UrlRepository.java           # Spring Data JPA
-├── response/
-│   ├── ErrorResponse.java           # Standardized error payload
-│   └── UrlResponse.java             # Unified response DTO
-├── service/
-│   ├── UrlMetricsService.java       # @Async click tracking
-│   ├── UrlService.java              # Service interface
-│   └── UrlServiceImpl.java          # Core business logic
-└── util/
-    └── Base62Encoder.java           # ID ↔ shortCode conversion
-```
-
----
-
-## 🗄️ Database Schema
-
-```sql
-CREATE TABLE urls (
-    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    short_code    VARCHAR(10) UNIQUE NULL,
-    url_hash      VARCHAR(64) UNIQUE NOT NULL,
-    long_url      VARCHAR(2048) NOT NULL,
-    click_count   BIGINT DEFAULT 0,
-    is_active     BOOLEAN DEFAULT TRUE,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_accessed TIMESTAMP NULL
-);
-```
-
-**Why `short_code` is nullable**: Supports the two-phase insert pattern — first insert gets the auto-increment ID, then Base62(ID) generates the short code.
-
-**Why `url_hash`**: SHA-256 hash of the long URL enables efficient duplicate detection via a `VARCHAR(64)` index instead of indexing the full 2048-char URL.
-
----
-
-## ⚙️ Configuration
-
-All secrets and environment-specific values are externalized:
-
-| Variable | Default | Description |
+| Technology | Purpose | Layer |
 |---|---|---|
-| `MYSQL_HOST` | `localhost` | MySQL hostname |
-| `MYSQL_PORT` | `3306` | MySQL port |
-| `MYSQL_DATABASE` | `url_shortener` | Database name |
-| `MYSQL_USERNAME` | `root` | DB username |
-| `MYSQL_PASSWORD` | `root` | DB password |
-| `REDIS_HOST` | `localhost` | Redis hostname |
-| `REDIS_PORT` | `6379` | Redis port |
-| `BASE_URL` | `http://localhost:8080` | Public-facing base URL |
-| `SERVER_PORT` | `8080` | Application port |
-| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed origins |
-| `SPRING_PROFILES_ACTIVE` | — | `dev`, `docker`, or `prod` |
-
-### Profiles
-
-| Profile | Schema Init | Flyway | SQL Logging | Use Case |
-|---|---|---|---|---|
-| `dev` | `schema.sql` | Disabled | DEBUG | Local development |
-| `docker` | `schema.sql` | Disabled | INFO | Docker Compose |
-| `prod` | Disabled | `V1__init.sql` | INFO | Production |
-
----
-
-## 🧪 Testing
-
-**37 tests** across 4 layers:
-
-```bash
-# Run all tests
-./mvnw clean test
-
-# Run specific test class
-./mvnw test -Dtest=UrlServiceImplTest
-```
-
-| Suite | Tests | Layer | Strategy |
-|---|---|---|---|
-| `Base62EncoderTest` | 8 | Utility | Pure JUnit (no Spring) |
-| `UrlServiceImplTest` | 10 | Service | Mockito mocks |
-| `UrlControllerTest` | 11 | Controller | MockMvc (@WebMvcTest) |
-| `UrlRepositoryTest` | 8 | Repository | H2 in-memory (@DataJpaTest) |
-
----
-
-## 🐳 Docker
-
-```bash
-# Build and start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f app
-
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes (reset DB)
-docker-compose down -v
-```
-
-**Services:**
-
-| Service | Image | Port (Host) | Port (Container) |
-|---|---|---|---|
-| `app` | Built from Dockerfile | 8080 | 8080 |
-| `mysql` | `mysql:8.0` | 3307 | 3306 |
-| `redis` | `redis:7-alpine` | 6380 | 6379 |
-
----
-
-## ☁️ Deployment
-
-### Render
-
-1. Create a new **Web Service** on [Render](https://render.com)
-2. Connect your GitHub repository
-3. Set **Build Command**: `./mvnw clean package -DskipTests`
-4. Set **Start Command**: `java -jar target/url-shortener-1.0.0.jar`
-5. Add environment variables:
-   - `SPRING_PROFILES_ACTIVE=prod`
-   - `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USERNAME`, `MYSQL_PASSWORD`
-   - `REDIS_HOST`, `REDIS_PORT`
-   - `BASE_URL=https://your-app.onrender.com`
-6. Create a **MySQL** and **Redis** service on Render and link them
-
-### Railway
-
-1. Create a new project on [Railway](https://railway.app)
-2. Add **MySQL** and **Redis** plugins from the dashboard
-3. Deploy from GitHub — Railway auto-detects Spring Boot
-4. Set environment variables (Railway auto-injects DB/Redis connection strings):
-   - `SPRING_PROFILES_ACTIVE=prod`
-   - `BASE_URL=https://your-app.up.railway.app`
-   - Map Railway's MySQL variables to `MYSQL_HOST`, `MYSQL_USERNAME`, etc.
-5. Railway handles builds automatically via the `Dockerfile`
-
-### AWS EC2
-
-1. Launch an EC2 instance (Amazon Linux 2 / Ubuntu)
-2. Install Docker and Docker Compose:
-   ```bash
-   sudo yum install -y docker
-   sudo service docker start
-   sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-   sudo chmod +x /usr/local/bin/docker-compose
-   ```
-3. Clone the repository and set environment variables:
-   ```bash
-   git clone https://github.com/yourusername/url-shortener.git
-   cd url-shortener
-   export BASE_URL=http://your-ec2-public-ip:8080
-   ```
-4. Start with Docker Compose:
-   ```bash
-   docker-compose up -d
-   ```
-5. Configure Security Group to allow inbound traffic on port `8080`
-6. (Optional) Set up **Nginx** as a reverse proxy with SSL via Let's Encrypt
-
----
-
-## 📬 Postman
-
-Import the included Postman collection:
-
-**File:** `url-shortener.postman_collection.json`
-
-The collection includes:
-- 12 requests covering all endpoints and edge cases
-- Collection variables: `{{base_url}}`, `{{short_code}}`
-- Auto-chaining: "Create Short URL" saves `short_code` for subsequent requests
-- Test assertions on every request
+| **Spring Boot 3.3** | Core application framework | Backend |
+| **Spring MVC** | RESTful endpoint routing | Backend |
+| **Spring Data JPA** | Database abstraction layer | Backend |
+| **Hibernate** | ORM provider | Backend |
+| **MySQL 8** | Primary persistent relational database | Infrastructure |
+| **Redis 7** | Distributed in-memory caching | Infrastructure |
+| **H2 Database** | In-memory DB for tests and sandbox | Infrastructure |
+| **Bucket4j** | Token-bucket rate limiting filter | Security |
+| **Docker & Compose** | Containerization and orchestration | DevOps |
+| **JUnit 5 & Mockito** | Testing frameworks | Testing |
+| **MockMvc** | Controller testing | Testing |
+| **Swagger (OpenAPI)** | Interactive API documentation | API |
+| **Flutter / Dart** | Cross-platform web frontend | Frontend |
+| **Maven** | Build and dependency management | Build |
 
 ---
 
 ## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License.
